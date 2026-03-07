@@ -28,11 +28,13 @@ const StudentDashboard = ({
   const [viewTab, setViewTab] = useState('video');
   const [fileType, setFileType] = useState('video');
 
-  const studentFiles = files[currentUser.dbId] || [];
-  const sharedWithMe = Object.values(shares)
-    .filter(share => share.recipientId === currentUser.dbId)
+  const studentFiles = (files && currentUser?.dbId) ? (files[currentUser.dbId] || []) : [];
+  const sharesMap = shares || {};
+  const sharedWithMe = Object.values(sharesMap)
+    .filter(share => share.recipientId === currentUser?.dbId)
     .map(share => {
-      const file = Object.values(files).flat().find(f => f.id === share.fileId);
+      const allFiles = Object.values(files || {}).flat();
+      const file = allFiles.find(f => f.id === share.fileId);
       return file;
     })
     .filter(Boolean);
@@ -47,8 +49,9 @@ const StudentDashboard = ({
   const textFiles = myUploads.filter(f => f.type === 'text');
   const audioFiles = myUploads.filter(f => f.type === 'audio');
 
-  const unreadNotifications = notifications.filter(n => n.userId === currentUser.dbId && !n.read).length;
-  const chatNotifications = notifications.filter(n => n.userId === currentUser.dbId && n.type === 'chat' && !n.read).length;
+  const notificationsList = notifications || [];
+  const unreadNotifications = notificationsList.filter(n => n.userId === currentUser?.dbId && !n.read).length;
+  const chatNotifications = notificationsList.filter(n => n.userId === currentUser?.dbId && n.type === 'chat' && !n.read).length;
 
   const FileList = ({ fileList, type }) => (
     fileList.length === 0 ? (

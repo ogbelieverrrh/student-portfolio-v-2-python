@@ -27,8 +27,9 @@ const TeacherDashboard = ({
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [viewTab, setViewTab] = useState('video');
 
-  const unreadNotifications = notifications.filter(n => n.userId === currentUser.dbId && !n.read).length;
-  const chatNotifications = notifications.filter(n => n.userId === currentUser.dbId && n.type === 'chat' && !n.read).length;
+  const notificationsList = notifications || [];
+  const unreadNotifications = notificationsList.filter(n => n.userId === currentUser?.dbId && !n.read).length;
+  const chatNotifications = notificationsList.filter(n => n.userId === currentUser?.dbId && n.type === 'chat' && !n.read).length;
 
   const TeacherFileViewer = ({ studentId }) => {
     const studentFiles = files[studentId] || [];

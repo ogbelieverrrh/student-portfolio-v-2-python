@@ -43,18 +43,23 @@ const ChatModal = ({
   const getRecipients = () => {
     const recipients = [];
     
+    if (!currentUser) return recipients;
+    
     // Add general chat option
     recipients.push({ id: 'general', name: '📢 General Chat', role: 'all', email: null });
     
+    const studentList = students || [];
+    const teacherList = teachers || [];
+    
     if (currentUser.role === 'admin') {
       // Admin can chat with everyone
-      students.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
-      teachers.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
+      studentList.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
+      teacherList.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
       recipients.push({ id: currentUser.id || currentUser.dbId, name: 'Admin (You)', role: 'admin', email: currentUser.email });
     } else if (currentUser.role === 'teacher') {
       // Teachers can chat with all students, other teachers, and admin
-      students.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
-      teachers.forEach(t => {
+      studentList.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
+      teacherList.forEach(t => {
         if (t.id !== currentUser.dbId) {
           recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email });
         }
@@ -65,12 +70,12 @@ const ChatModal = ({
       }
     } else if (currentUser.role === 'student') {
       // Students can chat with other students, teachers, and admin
-      students.forEach(s => {
+      studentList.forEach(s => {
         if (s.id !== currentUser.dbId) {
           recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email });
         }
       });
-      teachers.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
+      teacherList.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
       // Add admin as recipient for students
       if (admin) {
         recipients.push({ id: admin.id, name: '👨‍💼 Admin', role: 'admin', email: admin.email });

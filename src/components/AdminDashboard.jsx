@@ -38,11 +38,13 @@ const AdminDashboard = ({
   const [inviting, setInviting] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
 
-  const unreadNotifications = notifications.filter(n => n.userId === currentUser.id && !n.read).length;
-  const chatNotifications = notifications.filter(n => n.userId === currentUser.id && n.type === 'chat' && !n.read).length;
+  const notificationsList = notifications || [];
+  const unreadNotifications = notificationsList.filter(n => n.userId === currentUser?.id && !n.read).length;
+  const chatNotifications = notificationsList.filter(n => n.userId === currentUser?.id && n.type === 'chat' && !n.read).length;
 
   // Get all files from all students
-  const allFiles = Object.values(files).flat();
+  const filesMap = files || {};
+  const allFiles = Object.values(filesMap).flat();
   
   // Filter files by type
   const videoFiles = allFiles.filter(f => f.type === 'video' || f.mime_type?.startsWith('video/'));
@@ -62,7 +64,7 @@ const AdminDashboard = ({
 
   const displayedFiles = getFilesByType();
 
-  const totalFiles = Object.values(files).flat().length;
+  const totalFiles = Object.values(filesMap).flat().length;
 
   const handleInvite = async () => {
     if (!inviteForm.email) return;

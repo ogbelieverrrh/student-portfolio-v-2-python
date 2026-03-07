@@ -13,8 +13,9 @@ const NotificationPanel = ({
   if (!showNotificationPanel) return null;
 
   // Use dbId for students/teachers, id for admin
-  const userId = currentUser.role === 'admin' ? currentUser.id : currentUser.dbId;
-  const userNotifications = notifications.filter(n => n.userId === userId);
+  const userId = currentUser?.role === 'admin' ? currentUser.id : currentUser?.dbId;
+  const notificationsList = notifications || [];
+  const userNotifications = notificationsList.filter(n => n.userId === userId);
   const unreadCount = userNotifications.filter(n => !n.read).length;
   
   // Filter chat notifications

@@ -384,8 +384,19 @@ const App = () => {
   };
 
   const addNotification = async (userId, message, type = 'info') => {
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+        return v.toString(16);
+      });
+    };
+    
     const newNotification = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       userId,
       message,
       type,
@@ -505,8 +516,10 @@ const App = () => {
     }
 
     // Check if email already exists in database
-    const emailExists = students.find(s => s.email.toLowerCase() === email.toLowerCase()) || 
-                       teachers.find(t => t.email.toLowerCase() === email.toLowerCase());
+    const studentList = students || [];
+    const teacherList = teachers || [];
+    const emailExists = studentList.find(s => s.email?.toLowerCase() === email.toLowerCase()) || 
+                       teacherList.find(t => t.email?.toLowerCase() === email.toLowerCase());
     if (emailExists) {
       showNotification('Email already exists');
       return false;
@@ -868,7 +881,7 @@ const App = () => {
               
               setLoadingMessage('Loading your files...');
               setLoadingProgress(25);
-              const userFilesRes = await fetch(`${dbConfig.url}/rest/v1/files?student_id=eq.${user.dbId}&select=*&order=created_at.desc`, {
+              const userFilesRes = await fetch(`${dbConfig.url}/rest/v1/files?student_id=eq.${encodeURIComponent(user.dbId)}&select=*&order=created_at.desc`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const userFilesData = await userFilesRes.json();
@@ -879,7 +892,7 @@ const App = () => {
               
               setLoadingMessage('Loading shared files...');
               setLoadingProgress(45);
-              const sharesRes = await fetch(`${dbConfig.url}/rest/v1/shares?recipient_id=eq.${user.dbId}&select=*`, {
+              const sharesRes = await fetch(`${dbConfig.url}/rest/v1/shares?recipient_id=eq.${encodeURIComponent(user.dbId)}&select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const sharesData = await sharesRes.json();
@@ -927,7 +940,7 @@ const App = () => {
               const chatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=200`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
-              const privateChatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?or=(sender_id.eq.${user.dbId},recipient_id.eq.${user.dbId})&select=*&order=created_at.desc&limit=100`, {
+            const privateChatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?or=(sender_id.eq.${encodeURIComponent(user.dbId)},recipient_id.eq.${encodeURIComponent(user.dbId)})&select=*&order=created_at.desc&limit=100`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const chatData = await chatRes.json();
@@ -957,22 +970,21 @@ const App = () => {
                     }
                   });
               }
-              }
-            }
-            
-            setLoadingProgress(100);
-            setTimeout(() => {
-              setLoadingProgress(0);
-              setLoadingMessage('');
+              
+              setLoadingProgress(100);
+              setTimeout(() => {
+                setLoadingProgress(0);
+                setLoadingMessage('');
+                setIsLoggingIn(false);
+              }, 300);
+            } else {
+              setUnverifiedEmail(email);
+              setShowUnverifiedEmailNotification(true);
               setIsLoggingIn(false);
-            }, 300);
-          } else {
-          setUnverifiedEmail(email);
-          setShowUnverifiedEmailNotification(true);
-          setIsLoggingIn(false);
+            }
+          }
         }
       }
-    } else {
       showNotification('Invalid credentials. Please try again.');
       setIsLoggingIn(false);
     }
@@ -1322,21 +1334,21 @@ const App = () => {
         });
         
         // Also delete related likes and comments
-        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${fileId}`, {
+        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
           }
         });
-        await fetch(`${dbConfig.url}/rest/v1/comments?file_id=eq.${fileId}`, {
+        await fetch(`${dbConfig.url}/rest/v1/comments?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
           }
         });
-        await fetch(`${dbConfig.url}/rest/v1/shares?file_id=eq.${fileId}`, {
+        await fetch(`${dbConfig.url}/rest/v1/shares?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1394,7 +1406,7 @@ const App = () => {
 
     if (isConnected) {
       if (hasLiked) {
-        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${fileId}&user_id=eq.${currentUser.id}`, {
+        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${encodeURIComponent(fileId)}&user_id=eq.${encodeURIComponent(currentUser.id)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1432,10 +1444,17 @@ const App = () => {
     const file = Object.values(files).flat().find(f => f.id === fileId);
     if (!file) return;
 
+    // Determine the owner_id based on user role
+    // For students: use file.student_id
+    // For teachers: use file.teacher_id or currentUser.dbId
+    const ownerId = currentUser.role === 'teacher' 
+      ? (file.teacher_id || currentUser.dbId) 
+      : file.student_id;
+
     if (isConnected) {
       const sharesToSave = recipientIds.map(recipientId => ({
         file_id: fileId,
-        owner_id: file.student_id,
+        owner_id: ownerId,
         recipient_id: recipientId,
       }));
       const saved = await saveToDatabase('shares', sharesToSave);
@@ -1455,7 +1474,8 @@ const App = () => {
     } 
 
     recipientIds.forEach(recipientId => {
-      const recipient = students.find(s => s.id === recipientId);
+      // Search for recipient in both students and teachers
+      const recipient = students.find(s => s.id === recipientId) || teachers.find(t => t.id === recipientId);
       if (recipient) {
         addNotification(recipientId, `${currentUser.name} shared a file with you: ${file.name}`, 'share');
         sendEmailNotification(recipient.email, 'File Shared With You', `${currentUser.name} shared ${file.name} with you`);
@@ -1561,6 +1581,7 @@ const App = () => {
         selectedFileForShare={selectedFileForShare}
         setSelectedFileForShare={setSelectedFileForShare}
         students={students}
+        teachers={teachers}
         currentUser={currentUser}
         handleShareFile={handleShareFile}
         darkMode={darkMode}

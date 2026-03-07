@@ -1,12 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Database, Sun, Moon } from 'lucide-react';
 
 const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase, setDbConfig, setIsConnected, loadFromDatabase, setCurrentView }) => {
-    const [setupData, setSetupData] = useState({ url: '', key: '' });
+    const [setupData, setSetupData] = useState({ 
+      url: 'https://mkctqcmuhaoxrkjfzghq.supabase.co', 
+      key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rY3RxY211aGFveHJramZ6Z2hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODIwODksImV4cCI6MjA4Nzg1ODA4OX0.MmwRsxQhIz4r7zWQi1kSnxnCFOQHKibA_cFPV4RsLQA' 
+    });
     const [testing, setTesting] = useState(false);
+    const [autoConnected, setAutoConnected] = useState(false);
 
-    const testConnection = async () => {
+    useEffect(() => {
+      if (!autoConnected && setupData.url && setupData.key) {
+        setAutoConnected(true);
+        testConnection(true);
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const testConnection = async (isAuto = false) => {
       setTesting(true);
       try {
         const response = await fetch(`${setupData.url}/rest/v1/`, {
@@ -17,7 +29,7 @@ const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase
         });
         
         if (response.ok) {
-          showNotification('Connection successful!');
+          if (!isAuto) showNotification('Connection successful!');
           localStorage.setItem('dbConfig', JSON.stringify(setupData));
           const client = createClient(setupData.url, setupData.key);
           setSupabase(client);
@@ -28,10 +40,10 @@ const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase
           await loadFromDatabase(setupData);
           setCurrentView('login');
         } else {
-          showNotification('Connection failed. Please check your credentials.');
+          if (!isAuto) showNotification('Connection failed. Please check your credentials.');
         }
       } catch (error) {
-        showNotification('Connection error. Please check your URL and key.');
+        if (!isAuto) showNotification('Connection error. Please check your URL and key.');
       } finally {
         setTesting(false);
       }
@@ -272,7 +284,7 @@ CREATE POLICY "Enable all for shares" ON shares FOR ALL USING (true);
                 {testing ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Testing...
+                    Connecting...
                   </>
                 ) : (
                   <>
