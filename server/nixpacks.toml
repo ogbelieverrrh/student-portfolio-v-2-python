@@ -1,0 +1,9 @@
+{
+  "$schema": "nixpacks.toml",
+  "build": {
+    "nixpacks": "python311"
+  },
+  "start": {
+    "cmd": "pip install -r requirements.txt && python main.py"
+  }
+}
