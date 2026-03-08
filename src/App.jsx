@@ -22,6 +22,10 @@ const ADMIN_ACCOUNT = {
 };
 
 const getApiBase = (url) => {
+  // Prioritize the environment variable for the proxy API
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   return isLocalhost ? 'http://localhost:8000/api' : `${url}/rest/v1`;
 };
