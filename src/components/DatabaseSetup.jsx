@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import React, { useState, useEffect } from 'react';
+import { getSupabaseClient } from '../utils/supabaseClient';
 import { FileText, Database, Sun, Moon } from 'lucide-react';
 
 const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase, setDbConfig, setIsConnected, loadFromDatabase, setCurrentView }) => {
@@ -31,7 +31,7 @@ const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase
         if (response.ok) {
           if (!isAuto) showNotification('Connection successful!');
           localStorage.setItem('dbConfig', JSON.stringify(setupData));
-          const client = createClient(setupData.url, setupData.key);
+          const client = getSupabaseClient(setupData.url, setupData.key);
           setSupabase(client);
           setDbConfig(setupData);
           setIsConnected(true);
@@ -189,7 +189,7 @@ CREATE POLICY "Enable all for settings" ON settings FOR ALL USING (true);
 CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   file_id uuid REFERENCES files(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users(id),
+  user_id TEXT NOT NULL,
   user_name TEXT,
   user_role TEXT,
   text TEXT,
@@ -199,15 +199,15 @@ CREATE TABLE comments (
 CREATE TABLE likes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   file_id uuid REFERENCES files(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users(id),
+  user_id TEXT NOT NULL,
   UNIQUE(file_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS shares (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   file_id uuid REFERENCES files(id) ON DELETE CASCADE,
-  owner_id uuid REFERENCES students(id) ON DELETE CASCADE,
-  recipient_id uuid REFERENCES students(id) ON DELETE CASCADE
+  owner_id TEXT NOT NULL,
+  recipient_id TEXT NOT NULL
 );
 
 -- Create notifications table for real-time notifications
