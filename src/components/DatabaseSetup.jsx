@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import React, { useState, useEffect } from 'react';
+import { getSupabaseClient } from '../utils/supabaseClient';
 import { FileText, Database, Sun, Moon } from 'lucide-react';
 
 const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase, setDbConfig, setIsConnected, loadFromDatabase, setCurrentView }) => {
@@ -31,7 +31,7 @@ const DatabaseSetup = ({ darkMode, toggleDarkMode, showNotification, setSupabase
         if (response.ok) {
           if (!isAuto) showNotification('Connection successful!');
           localStorage.setItem('dbConfig', JSON.stringify(setupData));
-          const client = createClient(setupData.url, setupData.key);
+          const client = getSupabaseClient(setupData.url, setupData.key);
           setSupabase(client);
           setDbConfig(setupData);
           setIsConnected(true);
