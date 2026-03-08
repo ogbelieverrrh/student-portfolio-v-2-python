@@ -189,7 +189,7 @@ CREATE POLICY "Enable all for settings" ON settings FOR ALL USING (true);
 CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   file_id uuid REFERENCES files(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users(id),
+  user_id TEXT NOT NULL,
   user_name TEXT,
   user_role TEXT,
   text TEXT,
@@ -199,7 +199,7 @@ CREATE TABLE comments (
 CREATE TABLE likes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   file_id uuid REFERENCES files(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES auth.users(id),
+  user_id TEXT NOT NULL,
   UNIQUE(file_id, user_id)
 );
 
