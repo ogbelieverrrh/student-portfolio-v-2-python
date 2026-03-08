@@ -21,6 +21,11 @@ const ADMIN_ACCOUNT = {
   role: 'admin'
 };
 
+const getApiBase = (url) => {
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return isLocalhost ? 'http://localhost:8000/api' : `${url}/rest/v1`;
+};
+
 const App = () => {
   const [currentView, setCurrentView] = useState('setup');
   const [currentUser, setCurrentUser] = useState(null);
@@ -54,28 +59,30 @@ const App = () => {
   const loadFromDatabase = useCallback(async (config) => {
     if (!config.url || !config.key) return;
     
+    const apiBase = getApiBase(config.url);
+
     try {
-      // Load all data in parallel for faster loading
+      // Load all data in parallel for faster loading using the proxy for GET requests
       const [studentsRes, teachersRes, filesRes, commentsRes, likesRes, sharesRes, chatRes] = await Promise.all([
-        fetch(`${config.url}/rest/v1/students?select=*`, {
+        fetch(`${apiBase}/students?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/teachers?select=*`, {
+        fetch(`${apiBase}/teachers?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/files?select=*`, {
+        fetch(`${apiBase}/files?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/comments?select=*`, {
+        fetch(`${apiBase}/comments?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/likes?select=*`, {
+        fetch(`${apiBase}/likes?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/shares?select=*`, {
+        fetch(`${apiBase}/shares?select=*`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         }),
-        fetch(`${config.url}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=200`, {
+        fetch(`${apiBase}/chat_messages?select=*&order=created_at.desc&limit=200`, {
           headers: { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` }
         })
       ]);
@@ -342,8 +349,9 @@ const App = () => {
         
         // Only add notification if it's for the current user
         const targetUserId = currentUser?.role === 'admin' ? currentUser.id : currentUser?.dbId;
+        const targetUserIdStr = String(targetUserId || '');
         
-        if (newNotif.user_id === targetUserId) {
+        if (String(newNotif.user_id) === targetUserIdStr) {
           // Use functional update to check for duplicates
           setNotifications(prev => {
             // Avoid duplicate notifications
@@ -384,6 +392,7 @@ const App = () => {
   };
 
   const addNotification = async (userId, message, type = 'info') => {
+    const userIdStr = String(userId);
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -397,7 +406,7 @@ const App = () => {
     
     const newNotification = {
       id: generateUUID(),
-      userId,
+      userId: userIdStr,
       message,
       type,
       read: false,
@@ -411,7 +420,7 @@ const App = () => {
     if (isConnected && supabase) {
       try {
         await supabase.from('notifications').insert({
-          user_id: userId,
+          user_id: userIdStr,
           message: message,
           type: type,
           read: false,
@@ -432,9 +441,10 @@ const App = () => {
   // Mark all chat notifications as read
   const markAllChatNotificationsRead = () => {
     const userId = currentUser?.role === 'admin' ? currentUser?.id : currentUser?.dbId;
+    const userIdStr = String(userId || '');
     setNotifications(prev => 
       prev.map(n => 
-        (n.userId === userId && n.type === 'chat' && !n.read) 
+        (String(n.userId) === userIdStr && n.type === 'chat' && !n.read)
           ? { ...n, read: true } 
           : n
       )
@@ -531,6 +541,19 @@ const App = () => {
     }
 
     try {
+      // Check for valid email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showNotification('Please enter a valid email address');
+        return false;
+      }
+
+      // Check for password length
+      if (password.length < 6) {
+        showNotification('Password must be at least 6 characters long');
+        return false;
+      }
+
       // Create auth user via Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -595,10 +618,12 @@ const App = () => {
     setLoadingMessage('Connecting...');
     
     if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
+      const apiBase = getApiBase(dbConfig.url);
+
       setLoadingMessage('Loading students...');
       setLoadingProgress(10);
       
-      const studentsRes = await fetch(`${dbConfig.url}/rest/v1/students?select=*`, {
+      const studentsRes = await fetch(`${apiBase}/students?select=*`, {
         headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
       });
       const studentsData = await studentsRes.json();
@@ -606,7 +631,7 @@ const App = () => {
       setLoadingProgress(25);
       
       setLoadingMessage('Loading teachers...');
-      const teachersRes = await fetch(`${dbConfig.url}/rest/v1/teachers?select=*`, {
+      const teachersRes = await fetch(`${apiBase}/teachers?select=*`, {
         headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
       });
       const teachersData = await teachersRes.json();
@@ -614,7 +639,7 @@ const App = () => {
       setLoadingProgress(40);
       
       setLoadingMessage('Loading files...');
-      const filesRes = await fetch(`${dbConfig.url}/rest/v1/files?select=*`, {
+      const filesRes = await fetch(`${apiBase}/files?select=*`, {
         headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
       });
       const filesData = await filesRes.json();
@@ -628,13 +653,13 @@ const App = () => {
       
       setLoadingMessage('Loading comments & likes...');
       const [commentsRes, likesRes, sharesRes] = await Promise.all([
-        fetch(`${dbConfig.url}/rest/v1/comments?select=*`, {
+        fetch(`${apiBase}/comments?select=*`, {
           headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
         }),
-        fetch(`${dbConfig.url}/rest/v1/likes?select=*`, {
+        fetch(`${apiBase}/likes?select=*`, {
           headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
         }),
-        fetch(`${dbConfig.url}/rest/v1/shares?select=*`, {
+        fetch(`${apiBase}/shares?select=*`, {
           headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
         })
       ]);
@@ -667,7 +692,7 @@ const App = () => {
       setLoadingProgress(75);
       
       setLoadingMessage('Loading chat...');
-      const chatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=200`, {
+      const chatRes = await fetch(`${apiBase}/chat_messages?select=*&order=created_at.desc&limit=200`, {
         headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
       });
       const chatData = await chatRes.json();
@@ -740,10 +765,12 @@ const App = () => {
           showNotification(`Welcome back, ${user.name}!`);
 
           if (userRole === 'teacher') {
+            const apiBase = getApiBase(dbConfig.url);
+
             setLoadingMessage('Loading your profile...');
             setLoadingProgress(10);
             
-            const teachersRes = await fetch(`${dbConfig.url}/rest/v1/teachers?email=eq.${encodeURIComponent(email)}&select=*`, {
+            const teachersRes = await fetch(`${apiBase}/teachers?email=eq.${encodeURIComponent(email)}&select=*`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
             const teachersData = await teachersRes.json();
@@ -755,7 +782,7 @@ const App = () => {
             
             setLoadingMessage('Loading students...');
             setLoadingProgress(25);
-            const studentsRes = await fetch(`${dbConfig.url}/rest/v1/students?select=*`, {
+            const studentsRes = await fetch(`${apiBase}/students?select=*`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
             const studentsData = await studentsRes.json();
@@ -763,7 +790,7 @@ const App = () => {
             
             setLoadingMessage('Loading files...');
             setLoadingProgress(40);
-            const filesRes = await fetch(`${dbConfig.url}/rest/v1/files?select=*`, {
+            const filesRes = await fetch(`${apiBase}/files?select=*`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
             const allFilesData = await filesRes.json();
@@ -776,7 +803,7 @@ const App = () => {
             
             setLoadingMessage('Loading shares...');
             setLoadingProgress(55);
-            const sharesRes = await fetch(`${dbConfig.url}/rest/v1/shares?select=*`, {
+            const sharesRes = await fetch(`${apiBase}/shares?select=*`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
             const sharesData = await sharesRes.json();
@@ -793,10 +820,10 @@ const App = () => {
             setLoadingMessage('Loading comments & likes...');
             setLoadingProgress(70);
             const [commentsRes, likesRes] = await Promise.all([
-              fetch(`${dbConfig.url}/rest/v1/comments?select=*`, {
+              fetch(`${apiBase}/comments?select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               }),
-              fetch(`${dbConfig.url}/rest/v1/likes?select=*`, {
+              fetch(`${apiBase}/likes?select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               })
             ]);
@@ -817,10 +844,10 @@ const App = () => {
             
             setLoadingMessage('Loading chat...');
             setLoadingProgress(85);
-            const chatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=200`, {
+            const chatRes = await fetch(`${apiBase}/chat_messages?select=*&order=created_at.desc&limit=200`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
-            const privateChatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?or=(sender_id.eq.${user.dbId},recipient_id.eq.${user.dbId})&select=*&order=created_at.desc&limit=100`, {
+            const privateChatRes = await fetch(`${apiBase}/chat_messages?or=(sender_id.eq.${user.dbId},recipient_id.eq.${user.dbId})&select=*&order=created_at.desc&limit=100`, {
               headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
             });
             const chatData = await chatRes.json();
@@ -835,7 +862,7 @@ const App = () => {
               supabase
                 .from('notifications')
                 .select('*')
-                .eq('user_id', user.dbId)
+                .eq('user_id', String(user.dbId))
                 .order('created_at', { ascending: false })
                 .limit(50)
                 .then(({ data: notifData }) => {
@@ -859,12 +886,15 @@ const App = () => {
               setLoadingMessage('');
               setIsLoggingIn(false);
             }, 300);
+            return; // Return here too
           } else {
+            const apiBase = getApiBase(dbConfig.url);
+
             const [studentsRes, teachersRes] = await Promise.all([
-              fetch(`${dbConfig.url}/rest/v1/students?select=*`, {
+              fetch(`${apiBase}/students?select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               }),
-              fetch(`${dbConfig.url}/rest/v1/teachers?select=*`, {
+              fetch(`${apiBase}/teachers?select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               })
             ]);
@@ -881,7 +911,7 @@ const App = () => {
               
               setLoadingMessage('Loading your files...');
               setLoadingProgress(25);
-              const userFilesRes = await fetch(`${dbConfig.url}/rest/v1/files?student_id=eq.${encodeURIComponent(user.dbId)}&select=*&order=created_at.desc`, {
+              const userFilesRes = await fetch(`${apiBase}/files?student_id=eq.${encodeURIComponent(user.dbId)}&select=*&order=created_at.desc`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const userFilesData = await userFilesRes.json();
@@ -892,7 +922,7 @@ const App = () => {
               
               setLoadingMessage('Loading shared files...');
               setLoadingProgress(45);
-              const sharesRes = await fetch(`${dbConfig.url}/rest/v1/shares?recipient_id=eq.${encodeURIComponent(user.dbId)}&select=*`, {
+              const sharesRes = await fetch(`${apiBase}/shares?recipient_id=eq.${encodeURIComponent(user.dbId)}&select=*`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const sharesData = await sharesRes.json();
@@ -911,10 +941,10 @@ const App = () => {
               if (userFilesData && userFilesData.length > 0) {
                 const fileIds = userFilesData.map(f => f.id).join(',');
                 const [commentsRes, likesRes] = await Promise.all([
-                  fetch(`${dbConfig.url}/rest/v1/comments?file_id=in.(${fileIds})&select=*`, {
+                  fetch(`${apiBase}/comments?file_id=in.(${fileIds})&select=*`, {
                     headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
                   }),
-                  fetch(`${dbConfig.url}/rest/v1/likes?file_id=in.(${fileIds})&select=*`, {
+                  fetch(`${apiBase}/likes?file_id=in.(${fileIds})&select=*`, {
                     headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
                   })
                 ]);
@@ -937,10 +967,10 @@ const App = () => {
               
               setLoadingMessage('Loading chat...');
               setLoadingProgress(85);
-              const chatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=200`, {
+              const chatRes = await fetch(`${apiBase}/chat_messages?select=*&order=created_at.desc&limit=200`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
-            const privateChatRes = await fetch(`${dbConfig.url}/rest/v1/chat_messages?or=(sender_id.eq.${encodeURIComponent(user.dbId)},recipient_id.eq.${encodeURIComponent(user.dbId)})&select=*&order=created_at.desc&limit=100`, {
+            const privateChatRes = await fetch(`${apiBase}/chat_messages?or=(sender_id.eq.${encodeURIComponent(user.dbId)},recipient_id.eq.${encodeURIComponent(user.dbId)})&select=*&order=created_at.desc&limit=100`, {
                 headers: { 'apikey': dbConfig.key, 'Authorization': `Bearer ${dbConfig.key}` }
               });
               const chatData = await chatRes.json();
@@ -953,7 +983,7 @@ const App = () => {
                 supabase
                   .from('notifications')
                   .select('*')
-                  .eq('user_id', user.dbId)
+                  .eq('user_id', String(user.dbId))
                   .order('created_at', { ascending: false })
                   .limit(50)
                   .then(({ data: notifData }) => {
@@ -977,10 +1007,12 @@ const App = () => {
                 setLoadingMessage('');
                 setIsLoggingIn(false);
               }, 300);
+              return; // Return here to avoid "Invalid credentials" notification
             } else {
               setUnverifiedEmail(email);
               setShowUnverifiedEmailNotification(true);
               setIsLoggingIn(false);
+              return; // Return here too
             }
           }
         }
@@ -1174,7 +1206,7 @@ const App = () => {
 
     // Use the dbId from currentUser (already the correct student ID)
     const actualStudentId = currentUser.dbId;
-    if (!actualStudentId) {
+    if (!actualStudentId && currentUser.role !== 'admin') {
       showNotification('Error: Student profile not found. Please contact admin.');
       return;
     }
@@ -1182,7 +1214,7 @@ const App = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const newFile = {
-        student_id: actualStudentId,
+        student_id: actualStudentId || 'admin_001',
         name: file.name,
         type: fileType,
         upload_date: new Date().toLocaleDateString(),
@@ -1227,12 +1259,13 @@ const App = () => {
 
     // Determine if this is a general chat message
     const isGeneral = !recipient || recipient.id === 'general';
-    const senderId = sender.id || sender.dbId;
+    // Use dbId for students/teachers, and id for admin
+    const senderId = sender.role === 'admin' ? sender.id : sender.dbId;
 
     console.log('Sending message:', { messageText, recipient, isGeneral, senderId });
 
     const newMessage = {
-      sender_id: senderId,
+      sender_id: String(senderId),
       sender_name: sender.name,
       sender_role: sender.role,
       recipient_id: isGeneral ? null : recipient.id,
@@ -1275,10 +1308,11 @@ const App = () => {
     }
 
     const isGeneral = recipient?.id === 'general' || !recipient;
-    const senderId = sender.id || sender.dbId;
+    // Use dbId for students/teachers, and id for admin
+    const senderId = sender.role === 'admin' ? sender.id : sender.dbId;
 
     const newMessage = {
-      sender_id: senderId,
+      sender_id: String(senderId),
       sender_name: sender.name,
       sender_role: sender.role,
       recipient_id: isGeneral ? null : recipient.id,
@@ -1445,17 +1479,16 @@ const App = () => {
     if (!file) return;
 
     // Determine the owner_id based on user role
-    // For students: use file.student_id
-    // For teachers: use file.teacher_id or currentUser.dbId
-    const ownerId = currentUser.role === 'teacher' 
-      ? (file.teacher_id || currentUser.dbId) 
-      : file.student_id;
+    // Use String() to ensure consistent ID format for the updated database schema
+    const ownerId = currentUser.role === 'admin'
+      ? currentUser.id
+      : (currentUser.dbId || file.student_id || file.teacher_id);
 
     if (isConnected) {
       const sharesToSave = recipientIds.map(recipientId => ({
         file_id: fileId,
-        owner_id: ownerId,
-        recipient_id: recipientId,
+        owner_id: String(ownerId),
+        recipient_id: String(recipientId),
       }));
       const saved = await saveToDatabase('shares', sharesToSave);
       if (saved && saved.length > 0) {
