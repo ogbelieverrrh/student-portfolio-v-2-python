@@ -22,6 +22,10 @@ const ADMIN_ACCOUNT = {
 };
 
 const getApiBase = (url) => {
+  // Prioritize the environment variable for the proxy API
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   return isLocalhost ? 'http://localhost:8000/api' : `${url}/rest/v1`;
 };
@@ -122,7 +126,7 @@ const App = () => {
       const likesMap = {};
       (likesData || []).forEach(like => {
         if (!likesMap[like.file_id]) likesMap[like.file_id] = [];
-        likesMap[like.file_id].push(like.user_id);
+      likesMap[like.file_id].push(String(like.user_id));
       });
       setLikes(likesMap);
 
@@ -154,8 +158,9 @@ const App = () => {
 
     const savedDbConfig = JSON.parse(localStorage.getItem('dbConfig') || '{}');
     if (savedDbConfig.url && savedDbConfig.key) {
+      const apiBase = getApiBase(savedDbConfig.url);
       // Verify connection before setting isConnected to true
-      fetch(`${savedDbConfig.url}/rest/v1/`, {
+      fetch(`${apiBase}/`, {
         headers: {
           'apikey': savedDbConfig.key,
           'Authorization': `Bearer ${savedDbConfig.key}`
@@ -463,7 +468,8 @@ const App = () => {
 
   const saveToDatabase = async (endpoint, data, method = 'POST') => {
     try {
-      const response = await fetch(`${dbConfig.url}/rest/v1/${endpoint}`, {
+      const apiBase = getApiBase(dbConfig.url);
+      const response = await fetch(`${apiBase}/${endpoint}`, {
         method,
         headers: {
           'apikey': dbConfig.key,
@@ -495,7 +501,8 @@ const App = () => {
 
     if (isConnected) {
       try {
-        const settingsRes = await fetch(`${dbConfig.url}/rest/v1/settings?select=id&limit=1`, {
+        const apiBase = getApiBase(dbConfig.url);
+        const settingsRes = await fetch(`${apiBase}/settings?select=id&limit=1`, {
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
@@ -676,7 +683,7 @@ const App = () => {
       const likesMap = {};
       (likesData || []).forEach(like => {
         if (!likesMap[like.file_id]) likesMap[like.file_id] = [];
-        likesMap[like.file_id].push(like.user_id);
+        likesMap[like.file_id].push(String(like.user_id));
       });
       setLikes(likesMap);
       
@@ -838,7 +845,7 @@ const App = () => {
             const likesMap = {};
             (likesData || []).forEach(like => {
               if (!likesMap[like.file_id]) likesMap[like.file_id] = [];
-              likesMap[like.file_id].push(like.user_id);
+              likesMap[like.file_id].push(String(like.user_id));
             });
             setLikes(likesMap);
             
@@ -960,7 +967,7 @@ const App = () => {
                 const likesMap = {};
                 (likesData || []).forEach(like => {
                   if (!likesMap[like.file_id]) likesMap[like.file_id] = [];
-                  likesMap[like.file_id].push(like.user_id);
+                  likesMap[like.file_id].push(String(like.user_id));
                 });
                 setLikes(likesMap);
               }
@@ -1121,14 +1128,15 @@ const App = () => {
   const handleDeleteStudent = async (studentId) => {
     if (window.confirm('Are you sure you want to delete this student account? This action cannot be undone.')) {
       if (isConnected) {
-        await fetch(`${dbConfig.url}/rest/v1/students?id=eq.${studentId}`, {
+        const apiBase = getApiBase(dbConfig.url);
+        await fetch(`${apiBase}/students?id=eq.${studentId}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
           }
         });
-        await fetch(`${dbConfig.url}/rest/v1/files?student_id=eq.${studentId}`, {
+        await fetch(`${apiBase}/files?student_id=eq.${studentId}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1149,7 +1157,8 @@ const App = () => {
   const handleDeleteTeacher = async (teacherId) => {
     if (window.confirm('Are you sure you want to delete this teacher account? This action cannot be undone.')) {
       if (isConnected) {
-        await fetch(`${dbConfig.url}/rest/v1/teachers?id=eq.${teacherId}`, {
+        const apiBase = getApiBase(dbConfig.url);
+        await fetch(`${apiBase}/teachers?id=eq.${teacherId}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1345,7 +1354,8 @@ const App = () => {
   const handleDeleteMessage = async (messageId) => {
     if (!isConnected) return;
     
-    await fetch(`${dbConfig.url}/rest/v1/chat_messages?id=eq.${messageId}`, {
+    const apiBase = getApiBase(dbConfig.url);
+    await fetch(`${apiBase}/chat_messages?id=eq.${messageId}`, {
       method: 'DELETE',
       headers: {
         'apikey': dbConfig.key,
@@ -1359,7 +1369,8 @@ const App = () => {
   const handleDeleteFile = async (studentId, fileId) => {
     if (window.confirm('Are you sure you want to delete this file? This action cannot be undone.')) {
       if (isConnected) {
-        await fetch(`${dbConfig.url}/rest/v1/files?id=eq.${fileId}`, {
+        const apiBase = getApiBase(dbConfig.url);
+        await fetch(`${apiBase}/files?id=eq.${fileId}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1368,21 +1379,21 @@ const App = () => {
         });
         
         // Also delete related likes and comments
-        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${encodeURIComponent(fileId)}`, {
+        await fetch(`${apiBase}/likes?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
           }
         });
-        await fetch(`${dbConfig.url}/rest/v1/comments?file_id=eq.${encodeURIComponent(fileId)}`, {
+        await fetch(`${apiBase}/comments?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
             'Authorization': `Bearer ${dbConfig.key}`
           }
         });
-        await fetch(`${dbConfig.url}/rest/v1/shares?file_id=eq.${encodeURIComponent(fileId)}`, {
+        await fetch(`${apiBase}/shares?file_id=eq.${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1405,9 +1416,10 @@ const App = () => {
   };
 
   const handleAddComment = async (fileId, comment) => {
+    const currentUserId = currentUser.role === 'admin' ? currentUser.id : (currentUser.dbId || currentUser.id);
     const newComment = {
       file_id: fileId,
-      user_id: currentUser.id,
+      user_id: String(currentUserId),
       user_name: currentUser.name,
       user_role: currentUser.role,
       text: comment,
@@ -1435,12 +1447,14 @@ const App = () => {
   };
 
   const handleLikeFile = async (fileId) => {
-    const currentLikes = likes[fileId] || [];
-    const hasLiked = currentLikes.includes(currentUser.id);
+    const currentLikes = (likes[fileId] || []).map(id => String(id));
+    const currentUserId = currentUser.role === 'admin' ? currentUser.id : (currentUser.dbId || currentUser.id);
+    const hasLiked = currentLikes.includes(String(currentUserId));
 
     if (isConnected) {
+      const apiBase = getApiBase(dbConfig.url);
       if (hasLiked) {
-        await fetch(`${dbConfig.url}/rest/v1/likes?file_id=eq.${encodeURIComponent(fileId)}&user_id=eq.${encodeURIComponent(currentUser.id)}`, {
+        await fetch(`${apiBase}/likes?file_id=eq.${encodeURIComponent(fileId)}&user_id=eq.${encodeURIComponent(currentUserId)}`, {
           method: 'DELETE',
           headers: {
             'apikey': dbConfig.key,
@@ -1449,14 +1463,14 @@ const App = () => {
         });
         setLikes(prev => ({
           ...prev,
-          [fileId]: currentLikes.filter(id => id !== currentUser.id)
+          [fileId]: currentLikes.filter(id => String(id) !== String(currentUserId))
         }));
       } else {
-        const saved = await saveToDatabase('likes', { file_id: fileId, user_id: currentUser.id });
+        const saved = await saveToDatabase('likes', { file_id: fileId, user_id: String(currentUserId) });
         if (saved && saved.length > 0) {
           setLikes(prev => ({
             ...prev,
-            [fileId]: [...currentLikes, currentUser.id]
+            [fileId]: [...currentLikes, String(currentUserId)]
           }));
         }
       }

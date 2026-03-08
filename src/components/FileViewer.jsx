@@ -21,7 +21,8 @@ const FileViewer = ({
 
   const fileComments = comments[file.id] || [];
   const fileLikes = likes[file.id] || [];
-  const isLiked = fileLikes.includes(currentUser?.id);
+  const currentUserId = currentUser?.role === 'admin' ? currentUser?.id : (currentUser?.dbId || currentUser?.id);
+  const isLiked = fileLikes.some(id => String(id) === String(currentUserId));
 
   return (
     <div className={`border-2 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100'} rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all duration-300`}>

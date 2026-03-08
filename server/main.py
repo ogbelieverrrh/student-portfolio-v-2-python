@@ -131,23 +131,35 @@ class HTTPClientPool:
 http_pool = HTTPClientPool()
 
 # ============== SUPABASE HEADERS ==============
-@lru_cache()
-def get_headers() -> Dict[str, str]:
-    """Cached headers function for performance"""
-    return {
+def get_headers(extra_headers: Dict[str, str] = None) -> Dict[str, str]:
+    """Base headers function"""
+    headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
     }
+    if extra_headers:
+        forward_headers = ['prefer', 'range', 'if-none-match']
+        for k, v in extra_headers.items():
+            if k.lower() in forward_headers:
+                headers[k] = v
+    return headers
 
-def get_anon_headers() -> Dict[str, str]:
-    """Headers foranon requests"""
-    return {
+def get_anon_headers(extra_headers: Dict[str, str] = None) -> Dict[str, str]:
+    """Headers for anonymous requests"""
+    headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
         'Content-Type': 'application/json',
     }
+    if extra_headers:
+        # Only forward specific safe headers
+        forward_headers = ['prefer', 'range', 'if-none-match']
+        for k, v in extra_headers.items():
+            if k.lower() in forward_headers:
+                headers[k] = v
+    return headers
 
 # ============== CACHE KEY GENERATOR ==============
 def make_cache_key(endpoint: str, params: dict = None, body: bytes = None) -> str:
@@ -214,30 +226,40 @@ async def proxy(path: str, request: Request,
     
     # Forward request to Supabase
     client = await http_pool.get_client()
-    headers = get_anon_headers()
+
+    # Extract headers to forward
+    request_headers = dict(request.headers)
+    supabase_headers = get_anon_headers(request_headers)
     
     try:
         if request.method == "GET":
-            response = await client.get(full_url, headers=headers, params=params)
+            response = await client.get(full_url, headers=supabase_headers, params=params)
         elif request.method == "POST":
             body = await request.body()
             cache_key = make_cache_key(full_url, params, body)
-            response = await client.post(full_url, headers=headers, params=params, content=body)
+            response = await client.post(full_url, headers=supabase_headers, params=params, content=body)
         elif request.method == "PUT":
             body = await request.body()
-            response = await client.put(full_url, headers=headers, params=params, content=body)
+            response = await client.put(full_url, headers=supabase_headers, params=params, content=body)
         elif request.method == "PATCH":
             body = await request.body()
-            response = await client.patch(full_url, headers=headers, params=params, content=body)
+            response = await client.patch(full_url, headers=supabase_headers, params=params, content=body)
         elif request.method == "DELETE":
-            response = await client.delete(full_url, headers=headers, params=params)
+            response = await client.delete(full_url, headers=supabase_headers, params=params)
         else:
             raise HTTPException(status_code=405, detail="Method not allowed")
         
         if response.status_code >= 400:
             raise HTTPException(status_code=response.status_code, detail=response.text)
         
-        data = response.json()
+        # Handle empty responses (like 204 No Content)
+        if response.status_code == 204 or not response.content:
+            data = [] if request.method == "GET" else {}
+        else:
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                data = {"message": response.text}
         
         # Cache GET responses
         if request.method == "GET" and isinstance(data, list):
@@ -247,7 +269,7 @@ async def proxy(path: str, request: Request,
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             await invalidate_related_caches(path)
         
-        return JSONResponse(content=data)
+        return JSONResponse(content=data, status_code=response.status_code)
         
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Gateway Timeout - Supabase slow")
@@ -319,6 +341,7 @@ async def batch_request(requests: List[Dict[str, Any]]):
 @app.get("/api/students/{student_id}/files")
 async def get_student_files(
     student_id: str,
+    request: Request,
     type: Optional[str] = Query(None),
     limit: int = Query(50),
     offset: int = Query(0),
@@ -347,7 +370,7 @@ async def get_student_files(
     client = await http_pool.get_client()
     response = await client.get(
         f"{SUPABASE_URL}/rest/v1/files",
-        headers=get_headers(),
+        headers=get_headers(dict(request.headers)),
         params=params
     )
     
@@ -359,7 +382,7 @@ async def get_student_files(
     return data
 
 @app.get("/api/teachers/{teacher_id}/students")
-async def get_teacher_students(teacher_id: str):
+async def get_teacher_students(teacher_id: str, request: Request):
     """Get students for a teacher with caching"""
     cache_key = f"teachers/{teacher_id}/students"
     
@@ -370,7 +393,7 @@ async def get_teacher_students(teacher_id: str):
     client = await http_pool.get_client()
     response = await client.get(
         f"{SUPABASE_URL}/rest/v1/students",
-        headers=get_headers(),
+        headers=get_headers(dict(request.headers)),
         params={'select': '*', 'order': 'name.asc'}
     )
     
@@ -382,7 +405,7 @@ async def get_teacher_students(teacher_id: str):
     return data
 
 @app.get("/api/dashboard/{user_id}")
-async def get_dashboard_data(user_id: str, role: str = Query("student")):
+async def get_dashboard_data(user_id: str, request: Request, role: str = Query("student")):
     """Optimized endpoint - fetch all dashboard data in one go"""
     cache_key = f"dashboard/{user_id}/{role}"
     
@@ -392,22 +415,23 @@ async def get_dashboard_data(user_id: str, role: str = Query("student")):
     
     client = await http_pool.get_client()
     
+    extra_headers = dict(request.headers)
     if role == "student":
         # Fetch student data
         tasks = [
-            client.get(f"{SUPABASE_URL}/rest/v1/files", headers=get_headers(), 
+            client.get(f"{SUPABASE_URL}/rest/v1/files", headers=get_headers(extra_headers),
                       params={'student_id': f'eq.{user_id}', 'select': '*', 'order': 'created_at.desc', 'limit': 50}),
-            client.get(f"{SUPABASE_URL}/rest/v1/shares", headers=get_headers(),
+            client.get(f"{SUPABASE_URL}/rest/v1/shares", headers=get_headers(extra_headers),
                       params={'recipient_id': f'eq.{user_id}', 'select': '*'}),
-            client.get(f"{SUPABASE_URL}/rest/v1/notifications", headers=get_headers(),
+            client.get(f"{SUPABASE_URL}/rest/v1/notifications", headers=get_headers(extra_headers),
                       params={'user_id': f'eq.{user_id}', 'order': 'created_at.desc', 'limit': 20}),
         ]
     else:
         # Fetch teacher/admin data
         tasks = [
-            client.get(f"{SUPABASE_URL}/rest/v1/students", headers=get_headers(), params={'select': '*'}),
-            client.get(f"{SUPABASE_URL}/rest/v1/files", headers=get_headers(), params={'select': '*', 'limit': 100}),
-            client.get(f"{SUPABASE_URL}/rest/v1/shares", headers=get_headers(), params={'select': '*'}),
+            client.get(f"{SUPABASE_URL}/rest/v1/students", headers=get_headers(extra_headers), params={'select': '*'}),
+            client.get(f"{SUPABASE_URL}/rest/v1/files", headers=get_headers(extra_headers), params={'select': '*', 'limit': 100}),
+            client.get(f"{SUPABASE_URL}/rest/v1/shares", headers=get_headers(extra_headers), params={'select': '*'}),
         ]
     
     responses = await asyncio.gather(*tasks, return_exceptions=True)
