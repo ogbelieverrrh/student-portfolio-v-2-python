@@ -51,34 +51,36 @@ const ChatModal = ({
     const studentList = students || [];
     const teacherList = teachers || [];
     
+    const currentUserId = currentUser.role === 'admin' ? currentUser.id : currentUser.dbId;
+
     if (currentUser.role === 'admin') {
       // Admin can chat with everyone
-      studentList.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
-      teacherList.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
-      recipients.push({ id: currentUser.id || currentUser.dbId, name: 'Admin (You)', role: 'admin', email: currentUser.email });
+      studentList.forEach(s => recipients.push({ id: String(s.id), name: s.name, role: 'student', email: s.email }));
+      teacherList.forEach(t => recipients.push({ id: String(t.id), name: t.name, role: 'teacher', email: t.email }));
+      recipients.push({ id: String(currentUserId), name: 'Admin (You)', role: 'admin', email: currentUser.email });
     } else if (currentUser.role === 'teacher') {
       // Teachers can chat with all students, other teachers, and admin
-      studentList.forEach(s => recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email }));
+      studentList.forEach(s => recipients.push({ id: String(s.id), name: s.name, role: 'student', email: s.email }));
       teacherList.forEach(t => {
-        if (t.id !== currentUser.dbId) {
-          recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email });
+        if (String(t.id) !== String(currentUserId)) {
+          recipients.push({ id: String(t.id), name: t.name, role: 'teacher', email: t.email });
         }
       });
       // Add admin as recipient for teachers
       if (admin) {
-        recipients.push({ id: admin.id, name: '👨‍💼 Admin', role: 'admin', email: admin.email });
+        recipients.push({ id: String(admin.id), name: '👨‍💼 Admin', role: 'admin', email: admin.email });
       }
     } else if (currentUser.role === 'student') {
       // Students can chat with other students, teachers, and admin
       studentList.forEach(s => {
-        if (s.id !== currentUser.dbId) {
-          recipients.push({ id: s.id, name: s.name, role: 'student', email: s.email });
+        if (String(s.id) !== String(currentUserId)) {
+          recipients.push({ id: String(s.id), name: s.name, role: 'student', email: s.email });
         }
       });
-      teacherList.forEach(t => recipients.push({ id: t.id, name: t.name, role: 'teacher', email: t.email }));
+      teacherList.forEach(t => recipients.push({ id: String(t.id), name: t.name, role: 'teacher', email: t.email }));
       // Add admin as recipient for students
       if (admin) {
-        recipients.push({ id: admin.id, name: '👨‍💼 Admin', role: 'admin', email: admin.email });
+        recipients.push({ id: String(admin.id), name: '👨‍💼 Admin', role: 'admin', email: admin.email });
       }
     }
     
@@ -89,7 +91,7 @@ const ChatModal = ({
 
   // Filter messages based on chat type
   const getFilteredMessages = () => {
-    const currentUserId = currentUser.id || currentUser.dbId;
+    const currentUserId = currentUser.role === 'admin' ? currentUser.id : currentUser.dbId;
     const currentUserIdStr = String(currentUserId || '');
     const isAdmin = currentUser.role === 'admin';
     
@@ -302,7 +304,8 @@ const ChatModal = ({
             </div>
           ) : (
             filteredMessages.map((msg) => {
-              const isMyMessage = msg.sender_id === (currentUser.id || currentUser.dbId);
+              const currentUserId = currentUser.role === 'admin' ? currentUser.id : currentUser.dbId;
+              const isMyMessage = String(msg.sender_id) === String(currentUserId);
               const isGeneral = msg.is_general;
               
               return (
