@@ -203,13 +203,30 @@ app.add_middleware(
 )
 
 # ============== PROXY ENDPOINT ==============
-@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy(path: str, request: Request, 
                cache_control: str = Header(None),
                x_cache_bypass: str = Header(None)):
     
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return JSONResponse(
+            content={},
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Prefer",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Supabase not configured. Please set SUPABASE_URL and SUPABASE_KEY environment variables."},
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
     
     full_url = f"{SUPABASE_URL}/rest/v1/{path}"
     params = dict(request.query_params)
@@ -222,7 +239,13 @@ async def proxy(path: str, request: Request,
         cached = await cache.get(cache_key)
         if cached:
             status = cached.pop('_cache_status', 'hit')
-            headers = {"X-Cache": status.upper(), "X-Cache-Hit": "true"}
+            headers = {
+                "X-Cache": status.upper(),
+                "X-Cache-Hit": "true",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Prefer",
+            }
             return JSONResponse(content=cached, headers=headers)
     
     # Forward request to Supabase
@@ -248,10 +271,18 @@ async def proxy(path: str, request: Request,
         elif request.method == "DELETE":
             response = await client.delete(full_url, headers=supabase_headers, params=params)
         else:
-            raise HTTPException(status_code=405, detail="Method not allowed")
+            return JSONResponse(
+                status_code=405,
+                content={"detail": "Method not allowed"},
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
         
         if response.status_code >= 400:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            return JSONResponse(
+                status_code=response.status_code,
+                content={"detail": response.text},
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
         
         # Handle empty responses (like 204 No Content)
         if response.status_code == 204 or not response.content:
@@ -270,12 +301,28 @@ async def proxy(path: str, request: Request,
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             await invalidate_related_caches(path)
         
-        return JSONResponse(content=data, status_code=response.status_code)
+        return JSONResponse(
+            content=data,
+            status_code=response.status_code,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+            }
+        )
         
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Gateway Timeout - Supabase slow")
+        return JSONResponse(
+            status_code=504,
+            content={"detail": "Gateway Timeout - Supabase slow"},
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="Cannot connect to Supabase")
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Cannot connect to Supabase"},
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
 async def invalidate_related_caches(path: str):
     """Invalidate caches that might be affected by a write"""
