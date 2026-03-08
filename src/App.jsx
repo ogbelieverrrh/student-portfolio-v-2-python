@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import React, { useState, useEffect, useCallback } from 'react';
+import { getSupabaseClient } from './utils/supabaseClient';
 import DatabaseSetup from './components/DatabaseSetup';
 import LoginPage from './components/LoginPage';
 import StudentDashboard from './components/StudentDashboard';
@@ -167,7 +167,7 @@ const App = () => {
         }
       }).then(res => {
         if (res.ok) {
-          const client = createClient(savedDbConfig.url, savedDbConfig.key);
+          const client = getSupabaseClient(savedDbConfig.url, savedDbConfig.key);
           setSupabase(client);
           setDbConfig(savedDbConfig);
           setIsConnected(true);

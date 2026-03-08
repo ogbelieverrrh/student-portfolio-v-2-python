@@ -15,7 +15,8 @@ from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException, Request, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 import httpx
 import asyncio
 
@@ -196,7 +197,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -494,11 +495,41 @@ async def health_check():
         "version": "2.0.0"
     }
 
+# ============== SERVE FRONTEND ==============
+# Try to mount the build directory if it exists
+build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+static_dir = os.path.join(build_dir, "static")
+
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    # Check if this is an API or health route - let those be handled by their own handlers
+    if full_path.startswith("api/") or full_path == "api" or full_path == "health":
+        raise HTTPException(status_code=404)
+
+    # Check if the requested path exists as a file in the build directory
+    file_path = os.path.join(build_dir, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+
+    # Fallback to index.html for SPA routing
+    index_path = os.path.join(build_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+
+    raise HTTPException(status_code=404, detail="Not found")
+
 @app.get("/")
 async def root():
+    index_path = os.path.join(build_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {
         "name": "Student Portfolio API - Optimized",
         "version": "2.0.0",
+        "message": "Frontend not built. API is running.",
         "endpoints": {
             "proxy": "/api/{path}",
             "batch": "/api/batch",
