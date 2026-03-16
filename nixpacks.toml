@@ -2,7 +2,7 @@
 nixPkgs = ["python311", "nodejs"]
 
 [phases.install]
-cmds = ["npm install", "pip install -r server/requirements.txt"]
+cmds = ["npm install", "python3 -m pip install -r server/requirements.txt"]
 
 [phases.build]
 cmds = ["npm run build"]
