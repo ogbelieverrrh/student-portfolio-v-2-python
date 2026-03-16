@@ -7,5 +7,10 @@ cmds = ["npm install", "pip install -r server/requirements.txt"]
 [phases.build]
 cmds = ["npm run build"]
 
+[env]
+SUPABASE_URL = { from = "SUPABASE_URL", default = "" }
+SUPABASE_KEY = { from = "SUPABASE_KEY", default = "" }
+PORT = { from = "PORT", default = "8000" }
+
 [start]
 cmd = "cd server && python main.py"

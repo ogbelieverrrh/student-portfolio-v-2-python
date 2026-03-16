@@ -4,7 +4,7 @@
 
 export const API_CONFIG = {
   USE_PYTHON_SERVER: true,
-  PYTHON_SERVER_URL: 'https://student-portfolio-v-2-python-production.up.railway.app/',
+  PYTHON_SERVER_URL: '/',
   SUPABASE_URL: 'https://mkctqcmuhaoxrkjfzghq.supabase.co',
   SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rY3RxY211aGFveHJramZ6Z2hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODIwODksImV4cCI6MjA4Nzg1ODA4OX0.MmwRsxQhIz4r7zWQi1kSnxnCFOQHKibA_cFPV4RsLQA',
 };
